@@ -1,5 +1,6 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
+from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 
@@ -40,7 +41,7 @@ Rarity_CHOICES = [
 ]
     
 
-
+# === Product ====
 
 # Create your models here.
 
@@ -69,16 +70,20 @@ class Booster(Product):
     booster_code = models.CharField(max_length=10)
     version = models.CharField(max_length=255, default='v1')
 
+# === Order === 
+
 class Order(models.Model):
     id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
     def __str__(self):
         return f"Order {self.id} by {self.user.username}"
-    
+
+
+
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
     product_type = models.CharField(max_length=50)  # 'card' or 'booster'
@@ -89,15 +94,14 @@ class OrderItem(models.Model):
     def __str__(self):
         return f"{self.quantity} x {self.product_type} (ID: {self.product_id}) in Order {self.order.id}"
     
-class UserPoint(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    points = models.IntegerField(default=0)
-
     def __str__(self):
         return f"{self.user.username}: {self.points} points"
+    
+# === Transactions ===
+
 class PointTransaction(models.Model):
     id = models.CharField(primary_key=True, max_length=7, editable=False, default=generate_id)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     points = models.IntegerField() #positive or negative
     description = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -108,7 +112,7 @@ class PointTransaction(models.Model):
 
 
 class TournamentResult(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     tournament_name = models.CharField(max_length=255)
     position = models.CharField(max_length=255)
     point_earned = models.IntegerField(default=0)
@@ -130,7 +134,7 @@ class Reward(models.Model):
         return self.name
     
 class RewardRedemption(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     reward = models.ForeignKey(Reward, on_delete=models.CASCADE)
     redeemed_at = models.DateTimeField(auto_now_add=True)
 
@@ -140,9 +144,10 @@ class RewardRedemption(models.Model):
         unique_together = ('user', 'reward')
         ordering = ['-redeemed_at']
 
-class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+class UserProfile(AbstractUser):
     nickname = models.CharField(max_length=30, unique=True)
+    email = models.EmailField(unique=True, null=True, blank=True)
+    phone = models.CharField(max_length=15, null=True, blank=True)
     point = models.IntegerField(default=0)
     last_name_change = models.DateTimeField(null=True, blank=True)
 
@@ -150,4 +155,11 @@ class UserProfile(models.Model):
         """Check if the user can change their name based on the last change time."""
         if self.last_name_change:
             return timezone.now() - self.last_name_change >= timedelta(days=30)
-        return True    
+        return True
+
+    def __str__(self):
+        return self.username
+    class Meta:
+        verbose_name = 'User Profile'
+        verbose_name_plural = 'User Profiles'
+        ordering = ['username']    

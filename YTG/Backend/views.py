@@ -5,7 +5,10 @@ from rest_framework.permissions import AllowAny
 from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.utils.translation import gettext as _
 
+from . import serializers
+from . import models
 # Create your views here.
 
 
@@ -24,10 +27,27 @@ class LoginAPIView(APIView):
             is_admin = user.is_staff or user.is_superuser
 
             return Response({
+                'message': _('Login successful'),
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),
                 'is_admin': is_admin,
                 'username': user.username,
             })
         else:
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'message': _('Invalid credentials')}, status=status.HTTP_401_UNAUTHORIZED)
+        
+class RegisterAPIView(APIView):
+    """
+    API view for user registration.
+    """
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = serializers.RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response({
+                'message': _('User registered successfully'),
+                'username': user.username,
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
