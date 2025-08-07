@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -113,4 +113,79 @@ class UpdateUserAPIView(APIView):
             return Response({'message': _('No changes made to the profile')}, status=status.HTTP_400_BAD_REQUEST)
         
 
-            
+class AdminAddPointAPIVIew(APIView):
+    """
+    API view for admin to add points to a user.
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        serializers = serializers.PointTransactionSerializer(data=request.data)
+        if serializers.is_valid():
+            user_username = serializers.validated_data.get('user')
+            points = serializers.validated_data.get('points')
+            description = serializers.validated_data.get('description', '')
+
+            # Find the user by username
+            try:
+                user = models.UserProfile.objects.get(username=user_username)
+            except models.UserProfile.DoesNotExist:
+                return Response({'message': _('User not found')}, status=status.HTTP_404_NOT_FOUND)
+            # Create the point transaction
+            point_transaction = models.PointTransaction.objects.create(
+                user=user,
+                points=points,
+                description=description
+            )
+            # Update user's point balance
+            user.point += points
+            user.save()
+
+            return Response({
+                'message': _('Points added successfully'),
+                'user': user.username,
+                'points': point_transaction.points,
+                'description': point_transaction.description
+            }, status=status.HTTP_201_CREATED)
+        return Response({'message': _('Invalid data')}, status=status.HTTP_400_BAD_REQUEST)
+    
+class AdminTournamentResultAPIView(APIView):
+    """
+    API view for admin to add tournament results.
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        serializer = serializers.TournamentResultSerializer(data=request.data)
+        if serializer.is_valid():
+            user_username = serializer.validated_data.get('user')
+            tournament_name = serializer.validated_data.get('tournament_name')
+            position = serializer.validated_data.get('position')
+            point_earned = serializer.validated_data.get('point_earned', 0)
+
+            # Find the user by username
+            try:
+                user = models.UserProfile.objects.get(username=user_username)
+            except models.UserProfile.DoesNotExist:
+                return Response({'message': _('User not found')}, status=status.HTTP_404_NOT_FOUND)
+
+            # Create the tournament result
+            tournament_result = models.TournamentResult.objects.create(
+                user=user,
+                tournament_name=tournament_name,
+                position=position,
+                point_earned=point_earned
+            )
+
+            # Update user's point balance
+            user.point += point_earned
+            user.save()
+
+            return Response({
+                'message': _('Tournament result added successfully'),
+                'user': user.username,
+                'tournament_name': tournament_result.tournament_name,
+                'position': tournament_result.position,
+                'point_earned': tournament_result.point_earned
+            }, status=status.HTTP_201_CREATED)
+        return Response({'message': _('Invalid data')}, status=status.HTTP_400_BAD_REQUEST)
