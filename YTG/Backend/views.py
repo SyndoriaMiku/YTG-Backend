@@ -113,9 +113,9 @@ class UpdateUserAPIView(APIView):
             return Response({'message': _('No changes made to the profile')}, status=status.HTTP_400_BAD_REQUEST)
         
 
-class AdminAddPointAPIVIew(APIView):
+class AdminAdjustPointAPIView(APIView):
     """
-    API view for admin to add points to a user.
+    API view for admin to adjust points to a user.
     """
     permission_classes = [IsAdminUser]
 
@@ -189,3 +189,68 @@ class AdminTournamentResultAPIView(APIView):
                 'point_earned': tournament_result.point_earned
             }, status=status.HTTP_201_CREATED)
         return Response({'message': _('Invalid data')}, status=status.HTTP_400_BAD_REQUEST)
+    
+class UserPointAPIView(APIView):
+    """
+    API view for users to view their point balance.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            'username': request.user.username,
+            'points': request.user.point
+        }, status=status.HTTP_200_OK)
+
+class PointTransactionHistoryAPIView(APIView):
+    """
+    API view for users to view their point transactions.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get (self, request):
+        if request.user.is_staff or request.user.is_superuser and "user" in request.query_params:
+            user = request.query_params.get("user")
+            transactions = models.PointTransaction.objects.filter(user__username=user)
+        else:
+            transactions = models.PointTransaction.objects.filter(user=request.user)
+
+        serializer = serializers.PointTransactionSerializer(transactions, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class RedeemRewardAPIView(APIView):
+    """
+    API view for users to redeem rewards.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = serializers.RewardRedemptionSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            user = request.user
+            reward = serializer.validated_data.get('reward')
+
+            # Check if the user has enough points
+            if user.point < reward.cost:
+                return Response({'message': _('Not enough points to redeem this reward')}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Check if the reward is in stock
+            if reward.stock <= 0:
+                return Response({'message': _('This reward is out of stock')}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Create the redemption record
+            redemption = models.RewardRedemption.objects.create(user=user, reward=reward)
+
+            # Deduct points and update stock
+            user.point -= reward.cost
+            user.save()
+            reward.stock -= 1
+            reward.save()
+
+            return Response({
+                'message': _('Reward redeemed successfully'),
+                'reward': serializer.data,
+                'user_points': user.point
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
