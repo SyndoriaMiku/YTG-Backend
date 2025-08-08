@@ -10,7 +10,7 @@ urlpatterns = [
     path('tournament/add', views.AdminTournamentResultAPIView.as_view(), name='tournament_add'),
 
     #user path
-    path('user/points/', views.UserPointsAPIView.as_view(), name='user_points'),
+    path('user/points/', views.UserPointAPIView.as_view(), name='user_points'),
     path('user/points/history/', views.PointTransactionHistoryAPIView.as_view(), name='point_transaction_history'),
     path('user/point/redeem/', views.RedeemRewardAPIView.as_view(), name='point_redeem')
 ]
