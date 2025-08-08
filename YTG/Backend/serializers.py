@@ -114,23 +114,51 @@ class RewardRedemptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.RewardRedemption
-        fields = ['user', 'reward', 'redeemed_at']
-        read_only_fields = ['redeemed_at']
+        fields = ['user', 'reward', 'redeemed_at', 'status']
+        read_only_fields = ['user', 'redeemed_at', 'status']
 
     def get_user(self, obj):
         return obj.user.username
-
+    
     def validate(self, attrs):
         user = self.context['request'].user
         reward = attrs['reward']
 
-        if user.userprofile.point < reward.cost:
-            raise serializers.ValidationError(_("Insufficient points to redeem this reward."))
-
+        if user.point < reward.cost:
+            raise serializers.ValidationError(_("You do not have enough points to redeem this reward."))
         if reward.stock <= 0:
             raise serializers.ValidationError(_("This reward is out of stock."))
 
         return attrs
-
+    
     def create(self, validated_data):
+        validated_data['status'] = 'pending'
         return models.RewardRedemption.objects.create(**validated_data)
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.OrderItem
+        fields = ['id', 'product_type', 'product_id', 'quantity', 'product_name', 'price']
+
+    def get_product_name(self, obj):
+        if obj.product_type == 'card':
+            return models.Card.objects.get(id=obj.product_id).name
+        elif obj.product_type == 'booster':
+            return models.Booster.objects.get(id=obj.product_id).name
+        return None
+        return product.name if product else None
+    
+class OrderSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(many=True, readonly=True)
+
+    total_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.Order
+        fields = ['id', 'user', 'status', 'created_at', 'updated_at', 'items', 'total_price']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_total_price(self, obj):
+        return sum(item.price * item.quantity for item in obj.items.all())

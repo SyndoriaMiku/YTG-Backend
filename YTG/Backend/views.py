@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from . import serializers
 from . import models
+from . import permissions
 # Create your views here.
 
 
@@ -112,7 +113,6 @@ class UpdateUserAPIView(APIView):
         else:
             return Response({'message': _('No changes made to the profile')}, status=status.HTTP_400_BAD_REQUEST)
         
-
 class AdminAdjustPointAPIView(APIView):
     """
     API view for admin to adjust points to a user.
@@ -218,7 +218,6 @@ class PointTransactionHistoryAPIView(APIView):
         serializer = serializers.PointTransactionSerializer(transactions, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-
 class RedeemRewardAPIView(APIView):
     """
     API view for users to redeem rewards.
@@ -254,3 +253,115 @@ class RedeemRewardAPIView(APIView):
                 'user_points': user.point
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+# Order API Views
+
+class CreateOrderAPIView(APIView):
+    """
+    API view for creating an order.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        order = models.Order.objects.create(user=request.user, total_price=0)
+
+        items_data = request.data.get('items', [])
+        total_price = 0
+
+        for item in items_data:
+            product_type = item.get('product_type')
+            product_id = item.get('product_id')
+            quantity = item.get('quantity', 1)
+
+            if product_type == 'card':
+                product = get_object_or_404(models.Card, id=product_id)
+            elif product_type == 'booster':
+                product = get_object_or_404(models.Booster, id=product_id)
+            else:
+                return Response({'message': _('Invalid product type')}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if product.stock < quantity:
+                return Response({'message': _('Insufficient stock for product')}, status=status.HTTP_400_BAD_REQUEST)
+            
+            price = product.price * quantity
+            total_price += price
+
+            #Reduce stock
+            product.stock -= quantity
+            product.save()
+
+            # Create order item
+            order_item = models.OrderItem.objects.create(
+                order=order,
+                product_type=product_type,
+                product_id=product_id,
+                quantity=quantity,
+                price=price
+            )
+
+        # Update order total price
+        order.total_price = total_price
+        order.save()
+
+        return Response({
+            'message': _('Order created successfully'),
+            'order_id': order.id,
+            'total_price': order.total_price,
+            'items': serializers.OrderItemSerializer(order.items.all(), many=True).data
+        }, status=status.HTTP_201_CREATED)
+    
+class UserOrderView(APIView):
+    """
+    API view for users to view all their orders.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        orders = models.Order.objects.filter(user=request.user).order_by('-created_at')
+        serializer = serializers.OrderSerializer(orders, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class OrderDetailView(APIView):
+    """
+    API view for users to view details of a specific order.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, order_id):
+        order = get_object_or_404(models.Order, id=order_id, user=request.user)
+        serializer = serializers.OrderSerializer(order)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class CancelOrderAPIView(APIView):
+    """
+    API view for users to cancel an order.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        if not request.user.is_staff and not request.user.is_superuser:
+            order = get_object_or_404(models.Order, id=order_id, user=request.user)
+        else:
+            order = get_object_or_404(models.Order, id=order_id)
+
+        if order.status == 'cancelled':
+            return Response({'message': _('Order is already cancelled')}, status=status.HTTP_400_BAD_REQUEST)
+
+        if order.status != 'pending':
+            return Response({'message': _('Only pending orders can be cancelled')}, status=status.HTTP_400_BAD_REQUEST)
+        
+        #Update order status
+        order.status = 'cancelled'
+        order.save()
+
+        return Response({
+            'message': _('Order cancelled successfully'),
+            'order_id': order.id
+        }, status=status.HTTP_200_OK)
+    
+
+
+
+                
+            
+                

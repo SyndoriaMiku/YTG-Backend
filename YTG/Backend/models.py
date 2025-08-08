@@ -39,6 +39,13 @@ Rarity_CHOICES = [
     ('starlight rare', 'Starlight Rare'),
     ('holographic rare', 'Holographic Rare'),
 ]
+
+Status_CHOICES = [
+    ('pending', 'Pending'), #User created order, waiting for confirmation
+    ('confirmed', 'Confirmed'), #Admin confirmed the order
+    ('completed', 'Completed'), #Order completed, user received the products
+    ('cancelled', 'Cancelled'), #Order cancelled by user or admin
+]
     
 
 # === Product ====
@@ -78,6 +85,13 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    status = models.CharField(max_length=50, choices=Status_CHOICES, default='pending')
+
+    class Meta:
+        ordering = ['-created_at']
+        permissions = [
+            ('can_confirm_order', 'Can confirm order'),
+        ]
 
     def __str__(self):
         return f"Order {self.id} by {self.user.username}"
@@ -137,11 +151,12 @@ class RewardRedemption(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     reward = models.ForeignKey(Reward, on_delete=models.CASCADE)
     redeemed_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=50, choices=Status_CHOICES, default='pending')
 
     def __str__(self):
         return f"{self.user.username} redeemed {self.reward.name} on {self.redeemed_at.strftime('%Y-%m-%d %H:%M:%S')}"
     class Meta:
-        unique_together = ('user', 'reward')
+        unique_together = ('user', 'reward', 'status')
         ordering = ['-redeemed_at']
 
 class UserProfile(AbstractUser):
