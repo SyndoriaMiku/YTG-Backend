@@ -230,29 +230,79 @@ class RedeemRewardAPIView(APIView):
             user = request.user
             reward = serializer.validated_data.get('reward')
 
-            # Check if the user has enough points
+            #check if user has enough points
             if user.point < reward.cost:
-                return Response({'message': _('Not enough points to redeem this reward')}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Check if the reward is in stock
+                return Response({'message': _('Insufficient points to redeem this reward')}, status=status.HTTP_400_BAD_REQUEST)
+            #check if reward is in stock
             if reward.stock <= 0:
-                return Response({'message': _('This reward is out of stock')}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Create the redemption record
-            redemption = models.RewardRedemption.objects.create(user=user, reward=reward)
-
-            # Deduct points and update stock
-            user.point -= reward.cost
-            user.save()
-            reward.stock -= 1
-            reward.save()
-
+                return Response({'message': _('Reward is out of stock')}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create the reward redemption
+            redemption = models.RewardRedemption.objects.create(
+                user=user,
+                reward=reward,
+                status='pending'
+            )
             return Response({
-                'message': _('Reward redeemed successfully'),
-                'reward': serializer.data,
-                'user_points': user.point
+                'message': _('Your redemption request has been created'),
+                'redemption_id': redemption.id,
+                'status': redemption.status,
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class AdminRedemptionAPIView(APIView):
+    """
+    API view for admin to confirm or reject reward redemptions.
+    """
+    permission_classes = [permissions.IsStaffUser]
+    def post(self, request, redemption_id):
+        redemption = get_object_or_404(models.RewardRedemption, id=redemption_id)
+
+        if redemption.status != 'pending':
+            return Response({'message': _('This redemption has already been processed')}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = redemption.user
+        reward = redemption.reward
+
+        if user.point < reward.cost:
+            return Response({'message': _('User does not have enough points to redeem this reward')}, status=status.HTTP_400_BAD_REQUEST)
+        if reward.stock <= 0:
+            return Response({'message': _('This reward is out of stock')}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update user's points and reward stock
+        user.point -= reward.cost
+        user.save()
+        reward.stock -= 1
+        reward.save()
+
+        # Update redemption status
+        redemption.status = 'competed'
+        redemption.save()
+
+        return Response({
+            'message': _('Redemption confirmed successfully'),
+        }, status=status.HTTP_200_OK)
+    
+class AdminCancelRedemptionAPIView(APIView):
+    """
+    API view for admin to cancel reward redemptions.
+    """
+    permission_classes = [permissions.IsStaffUser]
+
+    def post(self, request, redemption_id):
+        redemption = get_object_or_404(models.RewardRedemption, id=redemption_id)
+
+        if redemption.status != 'pending':
+            return Response({'message': _('This redemption cannot be cancelled')}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update redemption status to cancelled
+        redemption.status = 'cancelled'
+        redemption.save()
+
+        return Response({
+            'message': _('Redemption cancelled successfully'),
+        }, status=status.HTTP_200_OK)
+        
     
 # Order API Views
 
