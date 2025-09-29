@@ -10,11 +10,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(read_only=True)
     email = serializers.EmailField(read_only=True)
     nickname = serializers.CharField(max_length=30, required=False)
+    ranking_point = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = models.UserProfile
-        fields = ['username', 'email', 'nickname', 'point', 'last_name_change']
-        read_only_fields = ['username', 'email', 'point', 'last_name_change']
+        fields = ['username', 'email', 'nickname', 'point', 'ranking_point', 'last_name_change']
+        read_only_fields = ['username', 'email', 'point', 'ranking_point', 'last_name_change']
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
@@ -66,15 +67,12 @@ class ChangeNicknameSerializer(serializers.Serializer):
         return instance
     
 class PointTransactionSerializer(serializers.ModelSerializer):
-    user = serializers.SerializerMethodField()
+    user = serializers.SlugRelatedField(slug_field='username', queryset=models.UserProfile.objects.all())
 
     class Meta:
         model = models.PointTransaction
         fields = ['id', 'user', 'points', 'description', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
-
-    def get_user(self, obj):
-        return obj.user.username
     def validate_points(self, value):
         if value == 0:
             raise serializers.ValidationError(_("Points cannot be zero."))
@@ -83,18 +81,20 @@ class PointTransactionSerializer(serializers.ModelSerializer):
         return models.PointTransaction.objects.create(**validated_data)
     
 class TournamentResultSerializer(serializers.ModelSerializer):
-    user = serializers.SerializerMethodField()
+    user = serializers.SlugRelatedField(slug_field='username', queryset=models.UserProfile.objects.all())
 
     class Meta:
         model = models.TournamentResult
-        fields = ['user', 'tournament_name', 'position', 'point_earned', 'created_at', 'updated_at']
+        fields = ['user', 'tournament_name', 'position', 'point_earned', 'ranking_point_earned', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
-    def get_user(self, obj):
-        return obj.user.username
     def validate_point_earned(self, value):
         if value < 0:
             raise serializers.ValidationError(_("Points earned cannot be negative."))
+        return value
+    def validate_ranking_point_earned(self, value):
+        if value < 0:
+            raise serializers.ValidationError(_("Ranking points earned cannot be negative."))
         return value
     def create(self, validated_data):
         return models.TournamentResult.objects.create(**validated_data)
@@ -151,7 +151,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         return product.name if product else None
     
 class OrderSerializer(serializers.ModelSerializer):
-    items = OrderItemSerializer(many=True, readonly=True)
+    items = OrderItemSerializer(many=True, read_only=True)
 
     total_price = serializers.SerializerMethodField()
 

@@ -108,9 +108,6 @@ class OrderItem(models.Model):
     def __str__(self):
         return f"{self.quantity} x {self.product_type} (ID: {self.product_id}) in Order {self.order.id}"
     
-    def __str__(self):
-        return f"{self.user.username}: {self.points} points"
-    
 # === Transactions ===
 
 class PointTransaction(models.Model):
@@ -130,6 +127,7 @@ class TournamentResult(models.Model):
     tournament_name = models.CharField(max_length=255)
     position = models.CharField(max_length=255)
     point_earned = models.IntegerField(default=0)
+    ranking_point_earned = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -164,6 +162,7 @@ class UserProfile(AbstractUser):
     email = models.EmailField(unique=True, null=True, blank=True)
     phone = models.CharField(max_length=15, null=True, blank=True)
     point = models.IntegerField(default=0)
+    ranking_point = models.IntegerField(default=0)
     last_name_change = models.DateTimeField(null=True, blank=True)
 
     def check_name_change_limit(self):

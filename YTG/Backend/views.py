@@ -7,6 +7,7 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils.translation import gettext as _
 from django.db import IntegrityError
+from django.db.models import Sum, Q, F
 from django.utils import timezone
 
 from . import serializers
@@ -100,18 +101,19 @@ class UpdateUserAPIView(APIView):
                 if user.check_name_change_limit():
                     user.nickname = new_nickname
                     user.last_name_change = timezone.now()
-                    updated_fields.extend('nickname', 'last_name_change')
+                    updated_fields.extend(['nickname', 'last_name_change'])
                 else:
                     return Response({'message': _('You can only change your nickname once every 30 days.')}, status=status.HTTP_400_BAD_REQUEST)
                 
         #Update if changes were made
-            try:
+        try:
+            if updated_fields:
                 user.save(update_fields=updated_fields)
                 return Response({'message': _('User profile updated successfully')}, status=status.HTTP_200_OK)
-            except IntegrityError as e:
-                return Response({'message': _('Error updating profile')}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return Response({'message': _('No changes made to the profile')}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({'message': _('No changes made to the profile')}, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError as e:
+            return Response({'message': _('Error updating profile')}, status=status.HTTP_400_BAD_REQUEST)
         
 class AdminAdjustPointAPIView(APIView):
     """
@@ -120,17 +122,12 @@ class AdminAdjustPointAPIView(APIView):
     permission_classes = [IsAdminUser]
 
     def post(self, request):
-        serializers = serializers.PointTransactionSerializer(data=request.data)
-        if serializers.is_valid():
-            user_username = serializers.validated_data.get('user')
-            points = serializers.validated_data.get('points')
-            description = serializers.validated_data.get('description', '')
+        serializer = serializers.PointTransactionSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.validated_data.get('user')
+            points = serializer.validated_data.get('points')
+            description = serializer.validated_data.get('description', '')
 
-            # Find the user by username
-            try:
-                user = models.UserProfile.objects.get(username=user_username)
-            except models.UserProfile.DoesNotExist:
-                return Response({'message': _('User not found')}, status=status.HTTP_404_NOT_FOUND)
             # Create the point transaction
             point_transaction = models.PointTransaction.objects.create(
                 user=user,
@@ -158,28 +155,27 @@ class AdminTournamentResultAPIView(APIView):
     def post(self, request):
         serializer = serializers.TournamentResultSerializer(data=request.data)
         if serializer.is_valid():
-            user_username = serializer.validated_data.get('user')
+            user = serializer.validated_data.get('user')
             tournament_name = serializer.validated_data.get('tournament_name')
             position = serializer.validated_data.get('position')
             point_earned = serializer.validated_data.get('point_earned', 0)
-
-            # Find the user by username
-            try:
-                user = models.UserProfile.objects.get(username=user_username)
-            except models.UserProfile.DoesNotExist:
-                return Response({'message': _('User not found')}, status=status.HTTP_404_NOT_FOUND)
+            ranking_point_earned = serializer.validated_data.get('ranking_point_earned', 0)
 
             # Create the tournament result
             tournament_result = models.TournamentResult.objects.create(
                 user=user,
                 tournament_name=tournament_name,
                 position=position,
-                point_earned=point_earned
+                point_earned=point_earned,
+                ranking_point_earned=ranking_point_earned
             )
 
-            # Update user's point balance
-            user.point += point_earned
-            user.save()
+            # Update user's ranking_point (for ranking only) and spendable point separately
+            if ranking_point_earned:
+                user.ranking_point += ranking_point_earned
+            if point_earned:
+                user.point += point_earned
+            user.save(update_fields=['ranking_point', 'point'])
 
             return Response({
                 'message': _('Tournament result added successfully'),
@@ -276,8 +272,15 @@ class AdminRedemptionAPIView(APIView):
         reward.save()
 
         # Update redemption status
-        redemption.status = 'competed'
+        redemption.status = 'completed'
         redemption.save()
+
+        # Record point transaction as spent
+        models.PointTransaction.objects.create(
+            user=user,
+            points=-reward.cost,
+            description=f"Redeemed: {reward.name}"
+        )
 
         return Response({
             'message': _('Redemption confirmed successfully'),
@@ -408,10 +411,37 @@ class CancelOrderAPIView(APIView):
             'message': _('Order cancelled successfully'),
             'order_id': order.id
         }, status=status.HTTP_200_OK)
-    
+        
+class MonthlyRankingAPIView(APIView):
+    permission_classes = [AllowAny]
 
+    def get(self, request):
+        year = int(request.query_params.get('year', timezone.now().year))
+        month = int(request.query_params.get('month', timezone.now().month))
+        top = int(request.query_params.get('top', 10))
 
+        start = timezone.datetime(year, month, 1, tzinfo=timezone.get_current_timezone())
+        if month == 12:
+            end = timezone.datetime(year + 1, 1, 1, tzinfo=timezone.get_current_timezone())
+        else:
+            end = timezone.datetime(year, month + 1, 1, tzinfo=timezone.get_current_timezone())
 
-                
-            
-                
+        # Use TournamentResult to compute monthly ranking points earned
+        qs = models.TournamentResult.objects.filter(created_at__gte=start, created_at__lt=end)
+        aggregated = qs.values('user__username').annotate(
+            ranking_earned=Sum('ranking_point_earned')
+        ).order_by('-ranking_earned')[:top]
+
+        results = []
+        for row in aggregated:
+            results.append({
+                'username': row['user__username'],
+                'ranking_earned': row['ranking_earned'] or 0,
+            })
+
+        return Response({
+            'year': year,
+            'month': month,
+            'top': top,
+            'ranking': results
+        }, status=status.HTTP_200_OK)

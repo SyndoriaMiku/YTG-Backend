@@ -12,5 +12,8 @@ urlpatterns = [
     #user path
     path('user/points/', views.UserPointAPIView.as_view(), name='user_points'),
     path('user/points/history/', views.PointTransactionHistoryAPIView.as_view(), name='point_transaction_history'),
-    path('user/point/redeem/', views.RedeemRewardAPIView.as_view(), name='point_redeem')
+    path('user/point/redeem/', views.RedeemRewardAPIView.as_view(), name='point_redeem'),
+
+    #guest path
+    path('ranking/monthly/', views.MonthlyRankingAPIView.as_view(), name='monthly_ranking')
 ]
