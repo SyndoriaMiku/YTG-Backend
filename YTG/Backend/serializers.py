@@ -96,6 +96,18 @@ class TournamentResultSerializer(serializers.ModelSerializer):
         if value < 0:
             raise serializers.ValidationError(_("Ranking points earned cannot be negative."))
         return value
+
+class TournamentBulkItemSerializer(serializers.Serializer):
+    nickname = serializers.CharField(max_length=30)
+    tournament_name = serializers.CharField(max_length=255)
+    position = serializers.CharField(max_length=255)
+    point_earned = serializers.IntegerField(min_value=0, default=0)
+    ranking_point_earned = serializers.IntegerField(min_value=0, default=0)
+
+    def validate_nickname(self, value):
+        if not models.UserProfile.objects.filter(nickname=value).exists():
+            raise serializers.ValidationError(_("User with this nickname does not exist."))
+        return value
     def create(self, validated_data):
         return models.TournamentResult.objects.create(**validated_data)
     

@@ -8,6 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils.translation import gettext as _
 from django.db import IntegrityError
 from django.db.models import Sum, Q, F
+from django.db import transaction
 from django.utils import timezone
 
 from . import serializers
@@ -185,6 +186,55 @@ class AdminTournamentResultAPIView(APIView):
                 'point_earned': tournament_result.point_earned
             }, status=status.HTTP_201_CREATED)
         return Response({'message': _('Invalid data')}, status=status.HTTP_400_BAD_REQUEST)
+
+class AdminTournamentBulkUpdateAPIView(APIView):
+    """
+    Admin bulk create/update tournament results from JSON array of items.
+    Each item: nickname, tournament_name, position, point_earned, ranking_point_earned
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        items = request.data if isinstance(request.data, list) else request.data.get('items', [])
+        if not isinstance(items, list) or not items:
+            return Response({'message': _('Invalid payload. Expecting a non-empty list.')}, status=status.HTTP_400_BAD_REQUEST)
+
+        item_serializer = serializers.TournamentBulkItemSerializer(data=items, many=True)
+        if not item_serializer.is_valid():
+            return Response(item_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        results = []
+        errors = []
+
+        for idx, data in enumerate(item_serializer.validated_data):
+            try:
+                with transaction.atomic():
+                    user = models.UserProfile.objects.select_for_update().get(nickname=data['nickname'])
+                    tr = models.TournamentResult.objects.create(
+                        user=user,
+                        tournament_name=data['tournament_name'],
+                        position=data['position'],
+                        point_earned=data.get('point_earned', 0),
+                        ranking_point_earned=data.get('ranking_point_earned', 0)
+                    )
+                    # Update user counters
+                    if data.get('ranking_point_earned', 0):
+                        user.ranking_point += data['ranking_point_earned']
+                    if data.get('point_earned', 0):
+                        user.point += data['point_earned']
+                    user.save(update_fields=['ranking_point', 'point'])
+                    results.append({
+                        'nickname': user.nickname,
+                        'tournament_name': tr.tournament_name,
+                        'position': tr.position,
+                        'point_earned': tr.point_earned,
+                        'ranking_point_earned': tr.ranking_point_earned,
+                    })
+            except Exception as exc:
+                errors.append({'index': idx, 'nickname': data['nickname'], 'error': str(exc)})
+
+        status_code = status.HTTP_207_MULTI_STATUS if errors else status.HTTP_201_CREATED
+        return Response({'results': results, 'errors': errors}, status=status_code)
     
 class UserPointAPIView(APIView):
     """
@@ -413,6 +463,9 @@ class CancelOrderAPIView(APIView):
         }, status=status.HTTP_200_OK)
         
 class MonthlyRankingAPIView(APIView):
+    """
+    API view for getting monthly ranking.
+    """
     permission_classes = [AllowAny]
 
     def get(self, request):

@@ -8,6 +8,7 @@ urlpatterns = [
     path('logout/', views.LogoutAPIView.as_view(), name='logout'),
     path('point/adjust/', views.AdminAdjustPointAPIView.as_view(), name='point_adjust'),
     path('tournament/add', views.AdminTournamentResultAPIView.as_view(), name='tournament_add'),
+    path('tournament/bulk', views.AdminTournamentBulkUpdateAPIView.as_view(), name='tournament_bulk'),
 
     #user path
     path('user/points/', views.UserPointAPIView.as_view(), name='user_points'),
