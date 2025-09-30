@@ -6,51 +6,50 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
+"Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2025-09-30 10:16+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"PO-Revision-Date: 2025-09-30 17:32+0700\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: vi\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Poedit 3.7\n"
 
 #: Backend/serializers.py:44
 msgid "Email is already in use."
-msgstr "Email này đã được sử dụng"
+msgstr "Email này đã được sử dụng."
 
 #: Backend/serializers.py:46
 msgid "Phone number is already in use."
-msgstr "Số điện thoại này đã được sử dụng"
+msgstr "Số điện thoại này đã được sử dụng."
 
 #: Backend/serializers.py:62
 msgid "This nickname is already taken."
-msgstr "Tên này đã được sử dụng"
+msgstr "Tên này đã được sử dụng."
 
 #: Backend/serializers.py:68 Backend/views.py:109
 msgid "You can only change your nickname once every 30 days."
-msgstr "Bạn chỉ có thể đổi tên một lần mỗi 30 ngày"
+msgstr "Bạn chỉ có thể đổi tên một lần mỗi 30 ngày."
 
 #: Backend/serializers.py:86
 msgid "Points cannot be zero."
-msgstr "Điểm không thể là 0"
+msgstr "Điểm không thể là 0."
 
 #: Backend/serializers.py:101
 msgid "Points earned cannot be negative."
-msgstr "Điểm thưởng không thể là âm"
+msgstr "Điểm thưởng không thể là âm."
 
 #: Backend/serializers.py:105
-#, fuzzy
-#| msgid "Points earned cannot be negative."
 msgid "Ranking points earned cannot be negative."
-msgstr "Điểm thưởng không thể là âm"
+msgstr "Điểm xếp hạng không thể là âm."
 
 #: Backend/serializers.py:117
 msgid "User with this nickname does not exist."
-msgstr ""
+msgstr "Người dùng có nickname này không tồn tại."
 
 #: Backend/tests/auth_test.py:25 Backend/views.py:55
 msgid "User registered successfully"
@@ -66,116 +65,92 @@ msgstr "Thông tin đăng nhập không chính xác"
 
 #: Backend/views.py:71
 msgid "Refresh token is required"
-msgstr ""
+msgstr "Yêu cầu token"
 
 #: Backend/views.py:75
-#, fuzzy
-#| msgid "Login successful"
 msgid "Logout successful"
-msgstr "Đăng nhập thành công"
+msgstr "Đăng xuất thành công"
 
 #: Backend/views.py:77
-#, fuzzy
-#| msgid "Invalid credentials"
 msgid "Invalid token"
-msgstr "Thông tin đăng nhập không chính xác"
+msgstr "Token không hợp lệ"
 
 #: Backend/views.py:115
-#, fuzzy
-#| msgid "User registered successfully"
 msgid "User profile updated successfully"
-msgstr "Đăng ký thành công"
+msgstr "Cập nhật thông tin người dùng thành công"
 
 #: Backend/views.py:117
 msgid "No changes made to the profile"
-msgstr ""
+msgstr "Không có thay đổi gì"
 
 #: Backend/views.py:119
 msgid "Error updating profile"
-msgstr ""
+msgstr "Lỗi cập nhập profile"
 
 #: Backend/views.py:145
-#, fuzzy
-#| msgid "Login successful"
 msgid "Points added successfully"
-msgstr "Đăng nhập thành công"
+msgstr "Thêm điểm thưởng thành công"
 
 #: Backend/views.py:150 Backend/views.py:190
-#, fuzzy
-#| msgid "Invalid credentials"
 msgid "Invalid data"
-msgstr "Thông tin đăng nhập không chính xác"
+msgstr "Dữ liệu không hợp lệ"
 
 #: Backend/views.py:184
-#, fuzzy
-#| msgid "User registered successfully"
 msgid "Tournament result added successfully"
-msgstr "Đăng ký thành công"
+msgstr "Kết quả thi đấu thêm thành công"
 
 #: Backend/views.py:202
 msgid "Invalid payload. Expecting a non-empty list."
-msgstr ""
+msgstr "Payload không hợp lệ."
 
 #: Backend/views.py:289
 msgid "Your redemption request has been created"
-msgstr ""
+msgstr "Yêu cầu đổi thưởng của bạn đã được tạo"
 
 #: Backend/views.py:303
 msgid "This redemption has already been processed"
-msgstr ""
+msgstr "Yêu cầu đổi thưởng của bạn đã được xử lý"
 
 #: Backend/views.py:309
-#, fuzzy
-#| msgid "Insufficient points to redeem this reward."
 msgid "User does not have enough points to redeem this reward"
 msgstr "Không đủ điểm để đổi thưởng"
 
 #: Backend/views.py:311
-#, fuzzy
-#| msgid "This reward is out of stock."
 msgid "This reward is out of stock"
 msgstr "Phần thưởng này đã hết"
 
 #: Backend/views.py:331
-#, fuzzy
-#| msgid "User registered successfully"
 msgid "Redemption confirmed successfully"
-msgstr "Đăng ký thành công"
+msgstr "Đổi thưởng đã được xác nhận"
 
 #: Backend/views.py:344
 msgid "This redemption cannot be cancelled"
-msgstr ""
+msgstr "Không thể hủy bỏ yêu cầu đổi thưởng này"
 
 #: Backend/views.py:351
-#, fuzzy
-#| msgid "User registered successfully"
 msgid "Redemption cancelled successfully"
-msgstr "Đăng ký thành công"
+msgstr "Hủy bỏ yêu cầu đổi thưởng thành công"
 
 #: Backend/views.py:379
 msgid "Invalid product type"
-msgstr ""
+msgstr "Loại sản phẩm không hợp lệ"
 
 #: Backend/views.py:382
 msgid "Insufficient stock for product"
-msgstr ""
+msgstr "Tốn kho sản phẩm không hợp lệ"
 
 #: Backend/views.py:405
-#, fuzzy
-#| msgid "User registered successfully"
 msgid "Order created successfully"
-msgstr "Đăng ký thành công"
+msgstr "Đơn hàng tạo thành công"
 
 #: Backend/views.py:446
 msgid "Order is already cancelled"
-msgstr ""
+msgstr "Đơn hàng đã bị hủy"
 
 #: Backend/views.py:449
 msgid "Only pending orders can be cancelled"
-msgstr ""
+msgstr "Chỉ đơn hàng đang được chờ xử lý mới có thể hủy"
 
 #: Backend/views.py:456
-#, fuzzy
-#| msgid "User registered successfully"
 msgid "Order cancelled successfully"
-msgstr "Đăng ký thành công"
+msgstr "Hủy đơn hàng thành công"
