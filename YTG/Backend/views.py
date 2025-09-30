@@ -489,7 +489,7 @@ class MonthlyRankingAPIView(APIView):
         
         aggregated = qs.values('user__username').annotate(
             ranking_earned=Sum('ranking_point_earned')
-        ).order_by('-ranking_earned')[:top]
+        ).order_by('-ranking_earned')
         
         # Manual pagination
         total_items = aggregated.count()
