@@ -166,6 +166,9 @@ class UserProfile(AbstractUser):
     last_name_change = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
+        # Set default nickname to username if not provided
+        if not self.nickname:
+            self.nickname = self.username
         # Coerce blank email strings to NULL to satisfy unique constraint in MySQL
         if not self.email:
             self.email = None

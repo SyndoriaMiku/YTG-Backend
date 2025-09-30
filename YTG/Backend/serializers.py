@@ -52,7 +52,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User(**validated_data)
         user.set_password(password)
         user.save()
-        models.UserProfile.objects.create(user=user, nickname=user.username)
         return user
 
 class ChangeNicknameSerializer(serializers.Serializer):
