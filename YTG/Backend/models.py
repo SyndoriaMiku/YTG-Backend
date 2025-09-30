@@ -158,7 +158,7 @@ class RewardRedemption(models.Model):
         ordering = ['-redeemed_at']
 
 class UserProfile(AbstractUser):
-    nickname = models.CharField(max_length=30, unique=True)
+    nickname = models.CharField(max_length=30)
     email = models.EmailField(unique=True, null=True, blank=True)
     phone = models.CharField(max_length=15, null=True, blank=True)
     point = models.IntegerField(default=0)

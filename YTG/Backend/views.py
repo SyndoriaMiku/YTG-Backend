@@ -457,6 +457,7 @@ class CancelOrderAPIView(APIView):
             'order_id': order.id
         }, status=status.HTTP_200_OK)
         
+# Ranking API Views        
 class MonthlyRankingAPIView(APIView):
     """
     API view for getting monthly ranking.
