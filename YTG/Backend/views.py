@@ -486,8 +486,8 @@ class MonthlyRankingAPIView(APIView):
 
         # Use TournamentResult to compute monthly ranking points earned
         qs = models.TournamentResult.objects.filter(created_at__gte=start, created_at__lt=end)
-        
-        aggregated = qs.values('user__username').annotate(
+
+        aggregated = qs.values('user__username', 'user__nickname').annotate(
             ranking_earned=Sum('ranking_point_earned')
         ).order_by('-ranking_earned')
         
