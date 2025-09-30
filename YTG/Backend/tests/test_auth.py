@@ -32,5 +32,20 @@ class AuthTests(APITestCase):
         resp2 = self.client.post(logout_url, {'refresh': refresh}, format='json')
         self.assertIn(resp2.status_code, [status.HTTP_205_RESET_CONTENT, status.HTTP_200_OK])
 
+    def test_register_invalid(self):
+        url = reverse('register')
+        # missing username
+        resp = self.client.post(url, {
+            'password': 'NewPass123!',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # duplicate username
+        resp2 = self.client.post(url, {
+            'username': self.user.username,
+            'password': 'AnotherPass123!',
+        }, format='json')
+        self.assertEqual(resp2.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 

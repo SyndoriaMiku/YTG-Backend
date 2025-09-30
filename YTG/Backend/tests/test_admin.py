@@ -59,3 +59,15 @@ class AdminEndpointsTests(APITestCase):
 
 
 
+    def test_tournament_bulk_invalid_payload(self):
+        self.client.force_authenticate(self.admin)
+        url_bulk = reverse('tournament_bulk')
+
+        # Not a list
+        r1 = self.client.post(url_bulk, {'bad': 'payload'}, format='json')
+        self.assertEqual(r1.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Empty list
+        r2 = self.client.post(url_bulk, [], format='json')
+        self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST)
+

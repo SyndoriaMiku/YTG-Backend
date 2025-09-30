@@ -36,3 +36,15 @@ class RewardsTests(APITestCase):
 
 
 
+
+    def test_redeem_invalid_payloads(self):
+        self.client.force_authenticate(self.user)
+        url_redeem = reverse('point_redeem')
+
+        # Missing reward field
+        r1 = self.client.post(url_redeem, {}, format='json')
+        self.assertEqual(r1.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Invalid reward id
+        r2 = self.client.post(url_redeem, {'reward': 999999}, format='json')
+        self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST)
