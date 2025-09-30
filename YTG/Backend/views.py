@@ -2,6 +2,7 @@ from django.shortcuts import get_object_or_404, render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from rest_framework.pagination import PageNumberPagination
 from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -467,30 +468,48 @@ class MonthlyRankingAPIView(APIView):
     def get(self, request):
         year = int(request.query_params.get('year', timezone.now().year))
         month = int(request.query_params.get('month', timezone.now().month))
-        top = int(request.query_params.get('top', 10))
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 10))
 
-        start = timezone.datetime(year, month, 1, tzinfo=timezone.get_current_timezone())
-        if month == 12:
-            end = timezone.datetime(year + 1, 1, 1, tzinfo=timezone.get_current_timezone())
-        else:
-            end = timezone.datetime(year, month + 1, 1, tzinfo=timezone.get_current_timezone())
+        # Validate date parameters
+        try:
+            start = timezone.datetime(year, month, 1, tzinfo=timezone.get_current_timezone())
+            if month == 12:
+                end = timezone.datetime(year + 1, 1, 1, tzinfo=timezone.get_current_timezone())
+            else:
+                end = timezone.datetime(year, month + 1, 1, tzinfo=timezone.get_current_timezone())
+        except ValueError:
+            return Response(
+                {'error': _('Invalid year or month')}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Use TournamentResult to compute monthly ranking points earned
         qs = models.TournamentResult.objects.filter(created_at__gte=start, created_at__lt=end)
+        
         aggregated = qs.values('user__username').annotate(
             ranking_earned=Sum('ranking_point_earned')
         ).order_by('-ranking_earned')[:top]
-
+        
+        # Manual pagination
+        total_items = aggregated.count()
+        total_pages = (total_items + page_size - 1) // page_size
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        
         results = []
-        for row in aggregated:
+        for row in aggregated[start_idx:end_idx]:
             results.append({
-                'username': row['user__username'],
+                'nickname': row['user__nickname'],
                 'ranking_earned': row['ranking_earned'] or 0,
             })
 
         return Response({
             'year': year,
             'month': month,
-            'top': top,
-            'ranking': results
+            'current_page': page,
+            'total_pages': total_pages,
+            'page_size': page_size,
+            'total_items': total_items,
+            'results': results
         }, status=status.HTTP_200_OK)
