@@ -32,6 +32,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         email = data.get('email')
         phone = data.get('phone')
 
+        # Normalize empty strings to None so uniqueness works with NULLs
+        if email == '':
+            data['email'] = None
+            email = None
+        if phone == '':
+            data['phone'] = None
+            phone = None
+
         if email and User.objects.filter(email=email).exists():
             raise serializers.ValidationError({_("Email is already in use.")})
         if phone and User.objects.filter(phone=phone).exists():
@@ -132,15 +140,8 @@ class RewardRedemptionSerializer(serializers.ModelSerializer):
     def get_user(self, obj):
         return obj.user.username
     
+    # Validation is deferred to admin confirmation step; creation is always allowed as pending
     def validate(self, attrs):
-        user = self.context['request'].user
-        reward = attrs['reward']
-
-        if user.point < reward.cost:
-            raise serializers.ValidationError(_("You do not have enough points to redeem this reward."))
-        if reward.stock <= 0:
-            raise serializers.ValidationError(_("This reward is out of stock."))
-
         return attrs
     
     def create(self, validated_data):

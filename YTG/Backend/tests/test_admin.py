@@ -58,3 +58,4 @@ class AdminEndpointsTests(APITestCase):
         self.assertEqual(self.user.ranking_point, 23)
 
 
+

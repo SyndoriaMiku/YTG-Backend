@@ -165,6 +165,12 @@ class UserProfile(AbstractUser):
     ranking_point = models.IntegerField(default=0)
     last_name_change = models.DateTimeField(null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        # Coerce blank email strings to NULL to satisfy unique constraint in MySQL
+        if not self.email:
+            self.email = None
+        super().save(*args, **kwargs)
+
     def check_name_change_limit(self):
         """Check if the user can change their name based on the last change time."""
         if self.last_name_change:

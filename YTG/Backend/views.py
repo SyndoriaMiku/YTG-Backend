@@ -61,7 +61,8 @@ class LogoutAPIView(APIView):
     """
     API view for user logout.
     """
-    permission_classes = [IsAuthenticated]
+    # AllowAny so clients can log out using refresh token without a valid access token
+    permission_classes = [AllowAny]
 
     def post(self, request):
         refresh_token = request.data.get('refresh')
@@ -89,7 +90,8 @@ class UpdateUserAPIView(APIView):
 
         #update data
         if 'email' in data:
-            user.email = data['email']
+            # Normalize blank string to None to satisfy DB unique constraint
+            user.email = data['email'] or None
             updated_fields.append('email')
 
         if 'phone' in data:
@@ -272,29 +274,22 @@ class RedeemRewardAPIView(APIView):
 
     def post(self, request):
         serializer = serializers.RewardRedemptionSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            user = request.user
-            reward = serializer.validated_data.get('reward')
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            #check if user has enough points
-            if user.point < reward.cost:
-                return Response({'message': _('Insufficient points to redeem this reward')}, status=status.HTTP_400_BAD_REQUEST)
-            #check if reward is in stock
-            if reward.stock <= 0:
-                return Response({'message': _('Reward is out of stock')}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Create the reward redemption
-            redemption = models.RewardRedemption.objects.create(
-                user=user,
-                reward=reward,
-                status='pending'
-            )
-            return Response({
-                'message': _('Your redemption request has been created'),
-                'redemption_id': redemption.id,
-                'status': redemption.status,
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Always allow creation as pending; enforcement happens in admin confirm
+        user = request.user
+        reward = serializer.validated_data.get('reward')
+        redemption = models.RewardRedemption.objects.create(
+            user=user,
+            reward=reward,
+            status='pending'
+        )
+        return Response({
+            'message': _('Your redemption request has been created'),
+            'redemption_id': redemption.id,
+            'status': redemption.status,
+        }, status=status.HTTP_201_CREATED)
     
 class AdminRedemptionAPIView(APIView):
     """

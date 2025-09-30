@@ -33,3 +33,4 @@ class AuthTests(APITestCase):
         self.assertIn(resp2.status_code, [status.HTTP_205_RESET_CONTENT, status.HTTP_200_OK])
 
 
+

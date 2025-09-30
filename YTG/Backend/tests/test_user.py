@@ -33,3 +33,4 @@ class UserProfileTests(APITestCase):
         # For now, ensure nickname change limit logic exists on model
         self.assertTrue(self.user.check_name_change_limit())
 
+

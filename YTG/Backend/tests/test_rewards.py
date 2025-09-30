@@ -35,3 +35,4 @@ class RewardsTests(APITestCase):
         request = self.client.post(url_confirm)
 
 
+
