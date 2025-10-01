@@ -1,10 +1,20 @@
 from rest_framework import serializers
 from django.utils import timezone
 from . import models
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 from django.utils.translation import gettext as _
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 User = get_user_model()
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        try:
+            # First, validate credentials and get tokens
+            data = super().validate(attrs)
+            return data
+        except Exception as e:
+            raise serializers.ValidationError(_('Invalid credentials'))
 
 class UserProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(read_only=True)
@@ -175,3 +185,17 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def get_total_price(self, obj):
         return sum(item.price * item.quantity for item in obj.items.all())
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        # Add custom claims
+        token['username'] = user.username
+        token['is_staff'] = user.is_staff
+        token['nickname'] = user.userprofile.nickname if hasattr(user, 'userprofile') else ""
+        token['point'] = user.userprofile.point if hasattr(user, 'userprofile') else 0
+        token['ranking_point'] = user.userprofile.ranking_point if hasattr(user, 'userprofile') else 0
+
+        return token

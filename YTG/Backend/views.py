@@ -17,30 +17,28 @@ from . import models
 from . import permissions
 # Create your views here.
 
-
 class LoginAPIView(APIView):
     """
-    API view for user login.
+    API view for user login using CustomTokenObtainPairSerializer.
     """
     permission_classes = [AllowAny]
 
     def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-        user = authenticate(request, username=username, password=password)
-        if user is not None:
-            refresh = RefreshToken.for_user(user)
-            is_admin = user.is_staff or user.is_superuser
-
-            return Response({
-                'message': _('Login successful'),
-                'access': str(refresh.access_token),
-                'refresh': str(refresh),
-                'is_admin': is_admin,
-                'username': user.username,
-            })
-        else:
+        try:
+            serializer = serializers.CustomTokenObtainPairSerializer(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                data = serializer.validated_data
+                return Response({
+                    'message': _('Login successful'),
+                    'access': data['access'],
+                    'refresh': data['refresh'],
+                    'is_admin': serializer.user.is_staff or serializer.user.is_superuser,
+                    'username': serializer.user.username
+                })
+        except serializers.ValidationError as e:
             return Response({'message': _('Invalid credentials')}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
 class RegisterAPIView(APIView):
     """
