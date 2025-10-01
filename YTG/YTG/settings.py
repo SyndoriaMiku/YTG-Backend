@@ -148,18 +148,18 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ),
     'DEFAULT_THROTTLE_CLASSES': (
         'rest_framework.throttling.UserRateThrottle',
         'rest_framework.throttling.AnonRateThrottle',
     ),
-    # Reasonable defaults; override via env if needed
     'DEFAULT_THROTTLE_RATES': {
         'user': config('THROTTLE_USER', default='1000/day'),
         'anon': config('THROTTLE_ANON', default='200/day'),
     },
 }
+
 
 
 

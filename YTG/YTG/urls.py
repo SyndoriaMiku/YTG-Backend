@@ -21,13 +21,12 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
 schema_view = get_schema_view(
-   openapi.Info(
-      title="YTG API",
-      default_version='v1',
-      description="API documentation for YTG project",
-      contact=openapi.Contact(email="lyralei2001@gmail.com"),
-   ),
-   public=True,
+    openapi.Info(
+        title="YTG API",
+        default_version='v1',
+        description="API documentation for YTG project",
+    ),
+    public=True,
     permission_classes=[permissions.AllowAny],
 )
 
