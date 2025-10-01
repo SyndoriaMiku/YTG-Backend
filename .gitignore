@@ -208,3 +208,4 @@ __marimo__/
 *.sh
 .DS_Store
 /.vscode
+.DS_Store
