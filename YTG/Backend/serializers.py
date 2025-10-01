@@ -16,6 +16,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         except Exception as e:
             raise serializers.ValidationError(_('Invalid credentials'))
 
+class UserListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.UserProfile
+        fields = ['id', 'username', 'email', 'nickname', 'point', 'ranking_point', 'is_staff', 'is_active']
+        read_only_fields = ['id', 'username', 'email', 'point', 'ranking_point', 'is_staff', 'is_active']
+
 class UserProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(read_only=True)
     email = serializers.EmailField(read_only=True)

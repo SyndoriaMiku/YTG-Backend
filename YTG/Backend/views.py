@@ -17,6 +17,17 @@ from . import models
 from . import permissions
 # Create your views here.
 
+class UserListAPIView(APIView):
+    """
+    API view for admin to get all users.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        users = models.UserProfile.objects.all().order_by('username')
+        serializer = serializers.UserListSerializer(users, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 class LoginAPIView(APIView):
     """
     API view for user login using CustomTokenObtainPairSerializer.
