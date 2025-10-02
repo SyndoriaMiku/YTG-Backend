@@ -65,7 +65,19 @@ class RegisterAPIView(APIView):
                 'message': _('User registered successfully'),
                 'username': user.username,
             }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Extract error messages and format them properly
+            error_messages = []
+            for field, errors in serializer.errors.items():
+                if isinstance(errors, list):
+                    for error in errors:
+                        error_messages.append(str(error))
+                else:
+                    error_messages.append(str(errors))
+            
+            return Response({
+                'message': '; '.join(error_messages) if error_messages else _('Registration failed')
+            }, status=status.HTTP_400_BAD_REQUEST)
     
 class LogoutAPIView(APIView):
     """
