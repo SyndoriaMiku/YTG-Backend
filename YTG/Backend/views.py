@@ -93,7 +93,7 @@ class UpdateUserAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self , request):
-        user = request.user
+        user = request.username
         data = request.data
 
         updated_fields = []
@@ -125,7 +125,7 @@ class UpdatePasswordAPIView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def patch(self, request):
         user = request.user
         current_password = request.data.get('current_password')
         new_password = request.data.get('new_password')
