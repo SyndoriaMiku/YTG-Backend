@@ -122,18 +122,19 @@ class TournamentResultSerializer(serializers.ModelSerializer):
         return value
 
 class TournamentBulkItemSerializer(serializers.Serializer):
-    nickname = serializers.CharField(max_length=30)
-    tournament_name = serializers.CharField(max_length=255)
-    position = serializers.CharField(max_length=255)
+    username = serializers.CharField(max_length=150)  # Django's default username max_length
+    position = serializers.CharField(max_length=255)  # Changed to CharField to accept strings like "1st", "2nd"
     point_earned = serializers.IntegerField(min_value=0, default=0)
     ranking_point_earned = serializers.IntegerField(min_value=0, default=0)
 
-    def validate_nickname(self, value):
-        if not models.UserProfile.objects.filter(nickname=value).exists():
-            raise serializers.ValidationError(_("User with this nickname does not exist."))
+    def validate_username(self, value):
+        if not models.UserProfile.objects.filter(username=value).exists():
+            raise serializers.ValidationError(_("User with this username does not exist."))
         return value
-    def create(self, validated_data):
-        return models.TournamentResult.objects.create(**validated_data)
+
+class TournamentBulkSerializer(serializers.Serializer):
+    tournament_name = serializers.CharField(max_length=255)
+    results = TournamentBulkItemSerializer(many=True)
     
 class RewardSerializer(serializers.ModelSerializer):
     class Meta:

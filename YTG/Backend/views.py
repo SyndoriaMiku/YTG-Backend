@@ -98,16 +98,7 @@ class UpdateUserAPIView(APIView):
 
         updated_fields = []
 
-        #update data
-        if 'email' in data:
-            # Normalize blank string to None to satisfy DB unique constraint
-            user.email = data['email'] or None
-            updated_fields.append('email')
-
-        if 'phone' in data:
-            user.phone = data['phone']
-            updated_fields.append('phone') 
-        
+        #update data        
         if 'nickname' in data:
             new_nickname = data['nickname']
             if user.nickname != new_nickname:
@@ -127,7 +118,28 @@ class UpdateUserAPIView(APIView):
                 return Response({'message': _('No changes made to the profile')}, status=status.HTTP_400_BAD_REQUEST)
         except IntegrityError as e:
             return Response({'message': _('Error updating profile')}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+class UpdatePasswordAPIView(APIView):
+    """
+    API view for updating user password.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+
+        if not current_password or not new_password:
+            return Response({'message': _('Current and new passwords are required')}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.check_password(current_password):
+            return Response({'message': _('Current password is incorrect')}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({'message': _('Password updated successfully')}, status=status.HTTP_200_OK)
+
 class AdminAdjustPointAPIView(APIView):
     """
     API view for admin to adjust points to a user.
@@ -201,63 +213,162 @@ class AdminTournamentResultAPIView(APIView):
 
 class AdminTournamentBulkUpdateAPIView(APIView):
     """
-    Admin bulk create/update tournament results from JSON array of items.
-    Each item: nickname, tournament_name, position, point_earned, ranking_point_earned
+    Admin bulk create tournament results from a tournament with multiple participants.
+    Request format:
+    {
+        "tournament_name": "Tournament Name",
+        "results": [
+            {
+                "username": "user1",
+                "position": 1,
+                "point_earned": 50,
+                "ranking_point_earned": 200
+            },
+            {
+                "username": "user2", 
+                "position": 2,
+                "point_earned": 30,
+                "ranking_point_earned": 100
+            }
+        ]
+    }
     """
     permission_classes = [IsAdminUser]
 
     def post(self, request):
-        items = request.data if isinstance(request.data, list) else request.data.get('items', [])
-        if not isinstance(items, list) or not items:
-            return Response({'message': _('Invalid payload. Expecting a non-empty list.')}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = serializers.TournamentBulkSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        item_serializer = serializers.TournamentBulkItemSerializer(data=items, many=True)
-        if not item_serializer.is_valid():
-            return Response(item_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        tournament_name = serializer.validated_data['tournament_name']
+        results_data = serializer.validated_data['results']
+        
         results = []
         errors = []
 
-        for idx, data in enumerate(item_serializer.validated_data):
+        for idx, result_data in enumerate(results_data):
             try:
                 with transaction.atomic():
-                    user = models.UserProfile.objects.select_for_update().get(nickname=data['nickname'])
-                    tr = models.TournamentResult.objects.create(
+                    user = models.UserProfile.objects.select_for_update().get(username=result_data['username'])
+                    
+                    # Create tournament result
+                    tournament_result = models.TournamentResult.objects.create(
                         user=user,
-                        tournament_name=data['tournament_name'],
-                        position=data['position'],
-                        point_earned=data.get('point_earned', 0),
-                        ranking_point_earned=data.get('ranking_point_earned', 0)
+                        tournament_name=tournament_name,
+                        position=result_data['position'],  # Keep as string (e.g., "1st", "2nd")
+                        point_earned=result_data.get('point_earned', 0),
+                        ranking_point_earned=result_data.get('ranking_point_earned', 0)
                     )
-                    # Update user counters
-                    if data.get('ranking_point_earned', 0):
-                        user.ranking_point += data['ranking_point_earned']
-                    if data.get('point_earned', 0):
-                        user.point += data['point_earned']
+                    
+                    # Update user points
+                    if result_data.get('ranking_point_earned', 0):
+                        user.ranking_point += result_data['ranking_point_earned']
+                    if result_data.get('point_earned', 0):
+                        user.point += result_data['point_earned']
                     user.save(update_fields=['ranking_point', 'point'])
+                    
                     results.append({
+                        'username': user.username,
                         'nickname': user.nickname,
-                        'tournament_name': tr.tournament_name,
-                        'position': tr.position,
-                        'point_earned': tr.point_earned,
-                        'ranking_point_earned': tr.ranking_point_earned,
+                        'tournament_name': tournament_result.tournament_name,
+                        'position': tournament_result.position,
+                        'point_earned': tournament_result.point_earned,
+                        'ranking_point_earned': tournament_result.ranking_point_earned,
                     })
+            except models.UserProfile.DoesNotExist:
+                errors.append({
+                    'index': idx, 
+                    'username': result_data['username'], 
+                    'error': f"User with username '{result_data['username']}' does not exist"
+                })
             except Exception as exc:
-                errors.append({'index': idx, 'nickname': data['nickname'], 'error': str(exc)})
+                errors.append({
+                    'index': idx, 
+                    'username': result_data['username'], 
+                    'error': str(exc)
+                })
 
         status_code = status.HTTP_207_MULTI_STATUS if errors else status.HTTP_201_CREATED
-        return Response({'results': results, 'errors': errors}, status=status_code)
+        return Response({
+            'message': _('Tournament results processed'),
+            'tournament_name': tournament_name,
+            'total_processed': len(results),
+            'total_errors': len(errors),
+            'results': results, 
+            'errors': errors
+        }, status=status_code)
     
-class UserPointAPIView(APIView):
+class AdminUserUpdateAPIView(APIView):
     """
-    API view for users to view their point balance.
+    API view for admin to update user profile.
+    """
+    permission_classes = [IsAdminUser]
+
+    def patch(self , request, username):
+        user = get_object_or_404(models.UserProfile, username=username)
+        data = request.data
+
+        updated_fields = []
+
+        #update data        
+        if 'nickname' in data:
+            new_nickname = data['nickname']
+            if user.nickname != new_nickname:
+                user.nickname = new_nickname
+                user.last_name_change = timezone.now()
+                updated_fields.extend(['nickname', 'last_name_change'])
+        if 'password' in data:
+            new_password = data['password']
+            user.set_password(new_password)
+            updated_fields.append('password')
+                
+        #Update if changes were made
+        try:
+            if updated_fields:
+                user.save(update_fields=updated_fields)
+                return Response({'message': _('User profile updated successfully')}, status=status.HTTP_200_OK)
+            else:
+                return Response({'message': _('No changes made to the profile')}, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError as e:
+            return Response({'message': _('Error updating profile')}, status=status.HTTP_400_BAD_REQUEST)    
+    
+class UserAPIView(APIView):
+    """
+    API view for users to view their complete profile information including this month's ranking points.
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        user = request.user
+        
+        # Calculate this month's ranking points from tournament results
+        current_date = timezone.now()
+        start_of_month = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if current_date.month == 12:
+            end_of_month = start_of_month.replace(year=current_date.year + 1, month=1)
+        else:
+            end_of_month = start_of_month.replace(month=current_date.month + 1)
+        
+        # Get this month's ranking points
+        this_month_ranking = models.TournamentResult.objects.filter(
+            user=user,
+            created_at__gte=start_of_month,
+            created_at__lt=end_of_month
+        ).aggregate(
+            monthly_ranking_points=Sum('ranking_point_earned')
+        )['monthly_ranking_points'] or 0
+        
         return Response({
-            'username': request.user.username,
-            'points': request.user.point
+            'username': user.username,
+            'nickname': user.nickname,
+            'email': user.email,
+            'phone': user.phone,
+            'point_balance': user.point,
+            'total_ranking_points': user.ranking_point,
+            'this_month_ranking_points': this_month_ranking,
+            'last_name_change': user.last_name_change,
+            'is_staff': user.is_staff,
+            'is_active': user.is_active
         }, status=status.HTTP_200_OK)
 
 class PointTransactionHistoryAPIView(APIView):
@@ -267,7 +378,7 @@ class PointTransactionHistoryAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get (self, request):
-        if request.user.is_staff or request.user.is_superuser and "user" in request.query_params:
+        if (request.user.is_staff or request.user.is_superuser) and "user" in request.query_params:
             user = request.query_params.get("user")
             transactions = models.PointTransaction.objects.filter(user__username=user)
         else:
@@ -521,4 +632,52 @@ class MonthlyRankingAPIView(APIView):
             'page_size': page_size,
             'total_items': total_items,
             'results': results
+        }, status=status.HTTP_200_OK)
+
+class UserRankingAPIView(APIView):
+    """
+    API View for getting a user's ranking information for a specific month/year.
+    Accepts username, year, and month parameters.
+    Returns only nickname and ranking_point_earned for privacy.
+    """
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        username = request.query_params.get('username')
+        year = request.query_params.get('year', timezone.now().year)
+        month = request.query_params.get('month', timezone.now().month)
+        
+        if not username:
+            return Response({'error': _('Username parameter is required')}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            year = int(year)
+            month = int(month)
+        except (ValueError, TypeError):
+            return Response({'error': _('Invalid year or month parameter')}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = get_object_or_404(models.UserProfile, username=username)
+
+        # Calculate ranking points for the specified month/year
+        try:
+            start_of_month = timezone.datetime(year, month, 1, tzinfo=timezone.get_current_timezone())
+            if month == 12:
+                end_of_month = timezone.datetime(year + 1, 1, 1, tzinfo=timezone.get_current_timezone())
+            else:
+                end_of_month = timezone.datetime(year, month + 1, 1, tzinfo=timezone.get_current_timezone())
+        except ValueError:
+            return Response({'error': _('Invalid year or month')}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get ranking points for the specified period
+        ranking_points = models.TournamentResult.objects.filter(
+            user=user,
+            created_at__gte=start_of_month,
+            created_at__lt=end_of_month
+        ).aggregate(
+            total_ranking_points=Sum('ranking_point_earned')
+        )['total_ranking_points'] or 0
+        
+        return Response({
+            'nickname': user.nickname,
+            'ranking_point_earned': ranking_points
         }, status=status.HTTP_200_OK)
