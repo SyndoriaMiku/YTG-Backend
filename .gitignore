@@ -208,4 +208,9 @@ __marimo__/
 *.sh
 .DS_Store
 /.vscode
+
+# MAcOS
+**/.DS_Store
 .DS_Store
+.AppleDouble
+.LSOverride

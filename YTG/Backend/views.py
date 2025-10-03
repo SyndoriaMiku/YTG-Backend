@@ -120,7 +120,7 @@ class UpdateUserAPIView(APIView):
                     user.last_name_change = timezone.now()
                     updated_fields.extend(['nickname', 'last_name_change'])
                 else:
-                    return Response({'message': _('You can only change your nickname once every 30 days.')}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'message': _('You can only change your nickname once every 30 days')}, status=status.HTTP_400_BAD_REQUEST)
                 
         #Update if changes were made
         try:
