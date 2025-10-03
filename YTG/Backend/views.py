@@ -106,7 +106,7 @@ class UpdateUserAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self , request):
-        user = request.username
+        user = request.user
         data = request.data
 
         updated_fields = []
