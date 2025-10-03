@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.pagination import PageNumberPagination
 from rest_framework import status
+from rest_framework.serializers import ValidationError
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils.translation import gettext as _
@@ -46,7 +47,7 @@ class LoginAPIView(APIView):
                     'is_admin': serializer.user.is_staff or serializer.user.is_superuser,
                     'username': serializer.user.username
                 })
-        except serializers.ValidationError as e:
+        except ValidationError as e:
             return Response({'message': _('Invalid credentials')}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
             return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
