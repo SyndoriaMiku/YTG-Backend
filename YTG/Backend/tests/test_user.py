@@ -16,8 +16,8 @@ class UserProfileTests(APITestCase):
         # Seed a transaction
         models.PointTransaction.objects.create(user=self.user, points=10, description='seed')
 
-        url_points = reverse('user_points')
-        resp = self.client.get(url_points)
+        url_info = reverse('user_info')  # Fixed URL name
+        resp = self.client.get(url_info)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data['username'], self.user.username)
 
@@ -28,9 +28,17 @@ class UserProfileTests(APITestCase):
 
     def test_update_profile(self):
         self.client.force_authenticate(self.user)
-        url = reverse('user_points').replace('points/', 'profile/update/')  # not defined; use direct view path if added later
-        # Fallback to direct call on UpdateUserAPIView path if exists; else skip
-        # For now, ensure nickname change limit logic exists on model
+        # Test that user can change nickname initially
         self.assertTrue(self.user.check_name_change_limit())
+        
+        url = reverse('user_update')  # Fixed URL name
+        # Test nickname update
+        resp = self.client.patch(url, {'nickname': 'new_nick'}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.nickname, 'new_nick')
+        
+        # After changing nickname, check that limit is now in effect
+        self.assertFalse(self.user.check_name_change_limit())
 
 

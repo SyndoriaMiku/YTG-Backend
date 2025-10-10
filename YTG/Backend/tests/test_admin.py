@@ -42,16 +42,18 @@ class AdminEndpointsTests(APITestCase):
 
         # bulk add
         url_bulk = reverse('tournament_bulk')
-        items = [
-            {
-                'nickname': self.user.nickname,
-                'tournament_name': 'City Open',
-                'position': '2nd',
-                'point_earned': 5,
-                'ranking_point_earned': 8,
-            }
-        ]
-        r2 = self.client.post(url_bulk, items, format='json')
+        payload_bulk = {
+            'tournament_name': 'City Open',
+            'results': [
+                {
+                    'username': self.user.username,
+                    'position': '2nd',
+                    'point_earned': 5,
+                    'ranking_point_earned': 8,
+                }
+            ]
+        }
+        r2 = self.client.post(url_bulk, payload_bulk, format='json')
         self.assertIn(r2.status_code, [status.HTTP_201_CREATED, status.HTTP_207_MULTI_STATUS])
         self.user.refresh_from_db()
         self.assertEqual(self.user.point, 15)
