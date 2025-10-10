@@ -28,5 +28,9 @@ urlpatterns = [
     path('ranking/user/', views.UserRankingAPIView.as_view(), name='user_ranking'),
     path('register/', views.RegisterAPIView.as_view(), name='register'),
     path('login/', views.LoginAPIView.as_view(), name='login'),
-    path('logout/', views.LogoutAPIView.as_view(), name='logout')
+    path('logout/', views.LogoutAPIView.as_view(), name='logout'),
+    
+    #passkey authentication
+    path('auth/passkey/challenge/', views.PasskeyChallengeAPIView.as_view(), name='passkey_challenge'),
+    path('auth/passkey/verify/', views.PasskeyVerifyAPIView.as_view(), name='passkey_verify'),
 ]

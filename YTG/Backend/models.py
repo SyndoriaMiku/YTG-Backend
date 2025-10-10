@@ -185,4 +185,22 @@ class UserProfile(AbstractUser):
     class Meta:
         verbose_name = 'User Profile'
         verbose_name_plural = 'User Profiles'
-        ordering = ['username']    
+        ordering = ['username']
+
+
+class PasskeyCredential(models.Model):
+    """Store passkey credentials for WebAuthn authentication."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='passkey_credentials')
+    credential_id = models.CharField(max_length=255, unique=True, db_index=True)  # Base64-encoded credential ID
+    public_key = models.TextField()  # Base64-encoded public key
+    sign_count = models.IntegerField(default=0)
+    transports = models.JSONField(default=list, blank=True)  # e.g., ['usb', 'nfc', 'ble', 'internal']
+    device_name = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.device_name or 'Passkey'}"    

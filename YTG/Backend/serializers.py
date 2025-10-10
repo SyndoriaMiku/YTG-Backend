@@ -158,3 +158,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['ranking_point'] = user.userprofile.ranking_point if hasattr(user, 'userprofile') else 0
 
         return token
+
+
+class PasskeyCredentialSerializer(serializers.ModelSerializer):
+    """Serializer for passkey credentials."""
+    class Meta:
+        model = models.PasskeyCredential
+        fields = ['id', 'credential_id', 'device_name', 'created_at', 'last_used']
+        read_only_fields = ['id', 'created_at', 'last_used']

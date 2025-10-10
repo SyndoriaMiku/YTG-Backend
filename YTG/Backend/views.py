@@ -12,6 +12,21 @@ from django.db import IntegrityError
 from django.db.models import Sum, Q, F
 from django.db import transaction
 from django.utils import timezone
+from django.core.cache import cache
+import json
+import base64
+
+# WebAuthn imports for passkey authentication
+from webauthn import (
+    generate_authentication_options,
+    verify_authentication_response,
+    options_to_json,
+)
+from webauthn.helpers.structs import (
+    AuthenticatorTransport,
+    PublicKeyCredentialDescriptor,
+)
+from webauthn.helpers.cose import COSEAlgorithmIdentifier
 
 from . import serializers
 from . import models
@@ -694,3 +709,164 @@ class UserRankingAPIView(APIView):
             'nickname': user.nickname,
             'ranking_point_earned': ranking_points
         }, status=status.HTTP_200_OK)
+
+# Passkey Authentication API Views
+
+class PasskeyChallengeAPIView(APIView):
+    """
+    Generate a WebAuthn authentication challenge for passkey login.
+    Returns challenge options that the client will use with navigator.credentials.get()
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get('username')
+        
+        if not username:
+            return Response({
+                'message': _('Username is required')
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = models.UserProfile.objects.get(username=username)
+        except models.UserProfile.DoesNotExist:
+            return Response({
+                'message': _('User not found')
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get user's passkey credentials
+        credentials = models.PasskeyCredential.objects.filter(user=user)
+        
+        if not credentials.exists():
+            return Response({
+                'message': _('No passkeys registered for this user')
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Build list of allowed credentials
+        allowed_credentials = []
+        for cred in credentials:
+            try:
+                credential_id_bytes = base64.urlsafe_b64decode(cred.credential_id + '==')
+                transports = [AuthenticatorTransport(t) for t in cred.transports] if cred.transports else []
+                allowed_credentials.append(
+                    PublicKeyCredentialDescriptor(
+                        id=credential_id_bytes,
+                        transports=transports
+                    )
+                )
+            except Exception as e:
+                continue
+        
+        # Generate authentication options
+        try:
+            options = generate_authentication_options(
+                rp_id=request.get_host().split(':')[0],  # Get domain without port
+                allow_credentials=allowed_credentials,
+                user_verification="preferred"
+            )
+            
+            # Store challenge in cache for 5 minutes
+            challenge_key = f"passkey_challenge_{username}"
+            cache.set(challenge_key, options.challenge, timeout=300)
+            
+            # Convert options to JSON-serializable format
+            options_json = options_to_json(options)
+            
+            return Response({
+                'options': json.loads(options_json)
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'message': _('Failed to generate challenge'),
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PasskeyVerifyAPIView(APIView):
+    """
+    Verify the WebAuthn authentication response and log the user in.
+    Returns JWT tokens on successful verification.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get('username')
+        credential_data = request.data.get('credential')
+        
+        if not username or not credential_data:
+            return Response({
+                'message': _('Username and credential data are required')
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = models.UserProfile.objects.get(username=username)
+        except models.UserProfile.DoesNotExist:
+            return Response({
+                'message': _('User not found')
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Retrieve stored challenge
+        challenge_key = f"passkey_challenge_{username}"
+        expected_challenge = cache.get(challenge_key)
+        
+        if not expected_challenge:
+            return Response({
+                'message': _('Challenge expired or not found. Please request a new challenge.')
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Extract credential ID from response
+            credential_id_b64 = base64.urlsafe_b64encode(
+                base64.b64decode(credential_data['id'])
+            ).decode('utf-8').rstrip('=')
+            
+            # Find matching credential
+            try:
+                credential = models.PasskeyCredential.objects.get(
+                    user=user,
+                    credential_id=credential_id_b64
+                )
+            except models.PasskeyCredential.DoesNotExist:
+                return Response({
+                    'message': _('Credential not found')
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Decode the public key
+            public_key_bytes = base64.b64decode(credential.public_key)
+            
+            # Verify the authentication response
+            verification = verify_authentication_response(
+                credential=credential_data,
+                expected_challenge=expected_challenge,
+                expected_rp_id=request.get_host().split(':')[0],
+                expected_origin=f"{request.scheme}://{request.get_host()}",
+                credential_public_key=public_key_bytes,
+                credential_current_sign_count=credential.sign_count,
+                require_user_verification=False
+            )
+            
+            # Update credential sign count and last used timestamp
+            credential.sign_count = verification.new_sign_count
+            credential.last_used = timezone.now()
+            credential.save(update_fields=['sign_count', 'last_used'])
+            
+            # Delete used challenge
+            cache.delete(challenge_key)
+            
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(user)
+            
+            return Response({
+                'message': _('Login successful'),
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'is_admin': user.is_staff or user.is_superuser,
+                'username': user.username
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'message': _('Authentication failed'),
+                'error': str(e)
+            }, status=status.HTTP_401_UNAUTHORIZED)
